@@ -3,12 +3,12 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>多能源流</title>
+  <title>多能源流 · 电能·热能·水流·现金流·碳排放</title>
   
-  <!-- PWA 必备：manifest 链接 -->
+  <!-- PWA 清单文件 -->
   <link rel="manifest" href="manifest.json">
   
-  <!-- iOS Safari 添加到主屏幕的 meta 标签 -->
+  <!-- iOS Safari 全屏支持 -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="能源流">
@@ -18,7 +18,6 @@
   <meta name="theme-color" content="#0a0e17">
   
   <style>
-    /* 你的原有CSS样式，保持不变 */
     * { margin:0; padding:0; box-sizing:border-box; }
     body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:#0a0e17; font-family:system-ui,'Segoe UI',sans-serif; }
     .container { position:relative; width:920px; height:640px; border-radius:24px; overflow:hidden; box-shadow:0 0 70px rgba(0,160,255,0.4),0 20px 50px rgba(0,0,0,0.8); background:#0d1020; cursor:pointer; }
@@ -46,394 +45,340 @@
   <span class="hint" id="hint">⚡点击管道切换 | 滚轮调节强度 | 空格键全局开关</span>
 </div>
 
-<!-- 你的原有 JavaScript 代码，完全不变 -->
 <script>
-  // 这里是上一版程序的完整 JavaScript 代码（从 "use strict" 开始一直到末尾）
-  // 为了篇幅，此处省略，请将你之前得到的最新完整 JS 代码粘贴在此处
-  <!DOCTYPE html>
-<html lang="zh-CN">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-  <title>多能源流 · 电·热·水 分别带现金流与CO₂云烟</title>
-  <style>
-    * { margin:0; padding:0; box-sizing:border-box; }
-    body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:#0a0e17; font-family:system-ui,'Segoe UI',sans-serif; }
-    .container { position:relative; width:920px; height:640px; border-radius:24px; overflow:hidden; box-shadow:0 0 70px rgba(0,160,255,0.4),0 20px 50px rgba(0,0,0,0.8); background:#0d1020; cursor:pointer; }
-    canvas { display:block; width:100%; height:100%; }
-    .dashboard { position:absolute; top:16px; right:18px; display:flex; flex-direction:column; gap:5px; pointer-events:none; z-index:10; font-size:11px; letter-spacing:0.4px; }
-    .card { background:rgba(8,12,24,0.8); border:1px solid #2e4a70; border-radius:8px; padding:5px 10px; backdrop-filter:blur(10px); display:flex; flex-wrap:wrap; align-items:baseline; gap:4px; }
-    .label { color:#a0bcd8; }
-    .value { font-weight:700; }
-    .unit { color:#8899aa; font-size:10px; }
-    .elec { color:#ffb347; text-shadow:0 0 8px #ff9900; }
-    .heat { color:#ff6b6b; text-shadow:0 0 8px #ff4444; }
-    .water { color:#5aa9ff; text-shadow:0 0 8px #3399ff; }
-    .cost-color { color:#ffd966; }
-    .carbon-color { color:#8bc34a; }
-    .total-row { border-top:1px solid #2e4a70; margin-top:4px; padding-top:5px; }
-    .hint { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); color:#8899bb; font-size:12px; letter-spacing:1.5px; pointer-events:none; text-shadow:0 0 10px #3366aa; animation:softPulse 2.8s infinite; white-space:nowrap; }
-    @keyframes softPulse { 0%,100%{opacity:0.45;} 50%{opacity:1;} }
-    @media (max-width:950px) { .container { width:96vw; height:64vw; } .dashboard { font-size:9px; gap:3px; right:6px; } .card { padding:3px 6px; } .hint { font-size:10px; bottom:8px; } }
-  </style>
-</head>
-<body>
-<div class="container" id="container">
-  <canvas id="energyCanvas"></canvas>
-  <div class="dashboard" id="dashboard">
-    <!-- 动态生成 -->
-  </div>
-  <span class="hint" id="hint">⚡点击管道切换 | 滚轮调节强度 | 空格键全局开关</span>
-</div>
-<script>
-  (function() {
-    const container = document.getElementById('container');
-    const canvas = document.getElementById('energyCanvas');
-    const ctx = canvas.getContext('2d');
-    const dashboardEl = document.getElementById('dashboard');
-    const hintEl = document.getElementById('hint');
+(function() {
+  const container = document.getElementById('container');
+  const canvas = document.getElementById('energyCanvas');
+  const ctx = canvas.getContext('2d');
+  const dashboardEl = document.getElementById('dashboard');
+  const hintEl = document.getElementById('hint');
 
-    let width, height, time = 0;
-    let globalOn = true;
-    let intensity = 1.0, targetIntensity = 1.0;
+  let width, height, time = 0;
+  let globalOn = true;
+  let intensity = 1.0, targetIntensity = 1.0;
 
-    const pipeCount = 3; // 电能、热能、水流
-    const PIPE_TYPE = ['electric', 'heat', 'water'];
-    const PIPE_LABELS = ['⚡ 电能', '🔥 热能', '💧 水流'];
-    const PIPE_COLORS = ['elec','heat','water'];
-    
-    let pipeY = [], pipeOuterR = 44, pipeInnerR = 28;
-    let particles = [];
-    const PARTICLES_PER_PIPE = 45; // 能源粒子数
-    const COINS_PER_PIPE = 18;     // 金币粒子数
-    let pulses = [], MAX_PULSES = 25;
-    
-    // 云烟粒子
-    let smokeParticles = [];
-    const MAX_SMOKE = 60;
-    
-    let mouseX = -200, mouseY = -200, targetMouseX = -200, targetMouseY = -200;
-    let mousePressed = false;
-    
-    // 实时数据
-    let data = {
-      elecPower: 0, heatPower: 0, waterFlow: 0,
-      elecCost: 0, heatCost: 0, waterCost: 0,
-      elecCO2: 0, heatCO2: 0, waterCO2: 0
-    };
+  const pipeCount = 3; // 电能、热能、水流
+  const PIPE_TYPE = ['electric', 'heat', 'water'];
+  const PIPE_LABELS = ['⚡ 电能', '🔥 热能', '💧 水流'];
+  
+  let pipeY = [], pipeOuterR = 44, pipeInnerR = 28;
+  let particles = [];
+  const PARTICLES_PER_PIPE = 45; // 能源粒子数
+  const COINS_PER_PIPE = 18;     // 金币粒子数
+  let pulses = [], MAX_PULSES = 25;
+  
+  // 云烟粒子
+  let smokeParticles = [];
+  const MAX_SMOKE = 60;
+  
+  let mouseX = -200, mouseY = -200, targetMouseX = -200, targetMouseY = -200;
+  let mousePressed = false;
+  
+  // 实时数据
+  let data = {
+    elecPower: 0, heatPower: 0, waterFlow: 0,
+    elecCost: 0, heatCost: 0, waterCost: 0,
+    elecCO2: 0, heatCO2: 0, waterCO2: 0
+  };
 
-    function resize() {
-      const rect = container.getBoundingClientRect();
-      const dpr = Math.min(devicePixelRatio || 1, 2);
-      width = rect.width; height = rect.height;
-      canvas.width = width * dpr; canvas.height = height * dpr;
-      ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr,dpr);
-      
-      pipeY = [];
-      const startY = height * 0.2, endY = height * 0.78, step = (endY - startY) / (pipeCount - 1);
-      for (let i = 0; i < pipeCount; i++) pipeY.push(startY + i * step);
-      pipeOuterR = Math.min(48, height * 0.075);
-      pipeInnerR = pipeOuterR * 0.62;
-      initParticles();
+  function resize() {
+    const rect = container.getBoundingClientRect();
+    const dpr = Math.min(devicePixelRatio || 1, 2);
+    width = rect.width; height = rect.height;
+    canvas.width = width * dpr; canvas.height = height * dpr;
+    ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr,dpr);
+    
+    pipeY = [];
+    const startY = height * 0.2, endY = height * 0.78, step = (endY - startY) / (pipeCount - 1);
+    for (let i = 0; i < pipeCount; i++) pipeY.push(startY + i * step);
+    pipeOuterR = Math.min(48, height * 0.075);
+    pipeInnerR = pipeOuterR * 0.62;
+    initParticles();
+  }
+
+  // ----- 粒子基类 -----
+  class Particle {
+    constructor(pipeIdx, type) {
+      this.pipeIdx = pipeIdx;
+      this.type = type; // 'energy' 或 'coin'
+      this.energyType = PIPE_TYPE[pipeIdx];
+      this.reset(true);
     }
-
-    // ----- 粒子基类 -----
-    class Particle {
-      constructor(pipeIdx, type) {
-        this.pipeIdx = pipeIdx;
-        this.type = type; // 'energy' 或 'coin'
-        this.energyType = PIPE_TYPE[pipeIdx];
-        this.reset(true);
+    reset(randomPos = false) {
+      const yCenter = pipeY[this.pipeIdx];
+      const margin = pipeInnerR * 0.72;
+      this.x = randomPos ? Math.random() * width : width + 30 + Math.random() * 80;
+      this.y = yCenter + (Math.random() - 0.5) * margin * 2;
+      this.size = this.type === 'coin' ? 4.0 + Math.random() * 4.5 : 2.0 + Math.random() * 3.0;
+      this.brightness = 0.5 + Math.random() * 0.5;
+      this.phase = Math.random() * Math.PI * 2;
+      this.trail = []; this.maxTrail = 4 + Math.floor(Math.random() * 5);
+      if (this.energyType === 'electric') { this.thermalAmp = 0.5+Math.random()*1.8; this.thermalFreq = 0.05+Math.random()*0.08; }
+      else if (this.energyType === 'heat') { this.thermalAmp = 1.3+Math.random()*3.0; this.thermalFreq = 0.07+Math.random()*0.11; }
+      else { this.thermalAmp = 0.3+Math.random()*1.2; this.thermalFreq = 0.04+Math.random()*0.06; }
+      this.thermalPhase = Math.random() * Math.PI * 2;
+    }
+    update(t, strength, isOn, coinSpeed) {
+      const yCenter = pipeY[this.pipeIdx];
+      const margin = pipeInnerR * 0.72;
+      let drift;
+      if (this.type === 'coin') drift = coinSpeed;
+      else {
+        if (this.energyType === 'electric') drift = 1.2 + strength * 3.3;
+        else if (this.energyType === 'heat') drift = 0.8 + strength * 2.5;
+        else drift = 0.9 + strength * 2.9;
       }
-      reset(randomPos = false) {
-        const yCenter = pipeY[this.pipeIdx];
-        const margin = pipeInnerR * 0.72;
-        this.x = randomPos ? Math.random() * width : width + 30 + Math.random() * 80;
-        this.y = yCenter + (Math.random() - 0.5) * margin * 2;
-        this.size = this.type === 'coin' ? 4.0 + Math.random() * 4.5 : 2.0 + Math.random() * 3.0;
-        this.brightness = 0.5 + Math.random() * 0.5;
-        this.phase = Math.random() * Math.PI * 2;
-        this.trail = []; this.maxTrail = 4 + Math.floor(Math.random() * 5);
-        if (this.energyType === 'electric') { this.thermalAmp = 0.5+Math.random()*1.8; this.thermalFreq = 0.05+Math.random()*0.08; }
-        else if (this.energyType === 'heat') { this.thermalAmp = 1.3+Math.random()*3.0; this.thermalFreq = 0.07+Math.random()*0.11; }
-        else { this.thermalAmp = 0.3+Math.random()*1.2; this.thermalFreq = 0.04+Math.random()*0.06; }
-        this.thermalPhase = Math.random() * Math.PI * 2;
-      }
-      update(t, strength, isOn, coinSpeed) {
-        const yCenter = pipeY[this.pipeIdx];
-        const margin = pipeInnerR * 0.72;
-        let drift;
-        if (this.type === 'coin') drift = coinSpeed;
-        else {
-          if (this.energyType === 'electric') drift = 1.2 + strength * 3.3;
-          else if (this.energyType === 'heat') drift = 0.8 + strength * 2.5;
-          else drift = 0.9 + strength * 2.9;
-        }
-        this.x += isOn ? drift : 0.03;
-        const jitterY = Math.sin(t * this.thermalFreq + this.thermalPhase) * this.thermalAmp;
-        this.y += jitterY * (isOn ? 1 : 0.4);
-        if (this.x > width + 40) { this.x = -40; this.y = yCenter + (Math.random()-0.5)*margin*2; this.trail=[]; }
-        else if (this.x < -40) { this.x = width+40; this.y = yCenter + (Math.random()-0.5)*margin*2; this.trail=[]; }
-        const top = yCenter - margin, bottom = yCenter + margin;
-        if (this.y < top) this.y = top + 0.5;
-        if (this.y > bottom) this.y = bottom - 0.5;
-        this.brightness = 0.45 + 0.55 * Math.sin(t * 0.07 + this.phase);
-        this.trail.push({x:this.x, y:this.y, life:1.0});
-        if (this.trail.length > this.maxTrail) this.trail.shift();
-        for (let tr of this.trail) tr.life -= 0.12;
-        this.trail = this.trail.filter(tr => tr.life > 0);
-      }
-      drawShape(ctx, x, y, size, alpha) {
-        const s = size * (this.type === 'coin' ? 3.0 : 2.4); // 金币放大2倍以上
-        ctx.save(); ctx.translate(x, y); ctx.scale(s/24, s/24);
-        if (this.type === 'coin') {
-          // 金币 (人民币硬币风格)
-          ctx.beginPath(); ctx.arc(0,0,11,0,Math.PI*2); ctx.strokeStyle='#b8860b'; ctx.lineWidth=3; ctx.setLineDash([3,2]); ctx.stroke(); ctx.setLineDash([]);
-          ctx.beginPath(); ctx.arc(0,0,8.5,0,Math.PI*2); ctx.fillStyle='#ffd700'; ctx.fill(); ctx.strokeStyle='#b8860b'; ctx.lineWidth=1.2; ctx.stroke();
-          ctx.fillStyle='#8b4513'; ctx.font='bold 10px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('¥',0,0);
+      this.x += isOn ? drift : 0.03;
+      const jitterY = Math.sin(t * this.thermalFreq + this.thermalPhase) * this.thermalAmp;
+      this.y += jitterY * (isOn ? 1 : 0.4);
+      if (this.x > width + 40) { this.x = -40; this.y = yCenter + (Math.random()-0.5)*margin*2; this.trail=[]; }
+      else if (this.x < -40) { this.x = width+40; this.y = yCenter + (Math.random()-0.5)*margin*2; this.trail=[]; }
+      const top = yCenter - margin, bottom = yCenter + margin;
+      if (this.y < top) this.y = top + 0.5;
+      if (this.y > bottom) this.y = bottom - 0.5;
+      this.brightness = 0.45 + 0.55 * Math.sin(t * 0.07 + this.phase);
+      this.trail.push({x:this.x, y:this.y, life:1.0});
+      if (this.trail.length > this.maxTrail) this.trail.shift();
+      for (let tr of this.trail) tr.life -= 0.12;
+      this.trail = this.trail.filter(tr => tr.life > 0);
+    }
+    drawShape(ctx, x, y, size, alpha) {
+      const s = size * (this.type === 'coin' ? 3.0 : 2.4);
+      ctx.save(); ctx.translate(x, y); ctx.scale(s/24, s/24);
+      if (this.type === 'coin') {
+        ctx.beginPath(); ctx.arc(0,0,11,0,Math.PI*2); ctx.strokeStyle='#b8860b'; ctx.lineWidth=3; ctx.setLineDash([3,2]); ctx.stroke(); ctx.setLineDash([]);
+        ctx.beginPath(); ctx.arc(0,0,8.5,0,Math.PI*2); ctx.fillStyle='#ffd700'; ctx.fill(); ctx.strokeStyle='#b8860b'; ctx.lineWidth=1.2; ctx.stroke();
+        ctx.fillStyle='#8b4513'; ctx.font='bold 10px Arial'; ctx.textAlign='center'; ctx.textBaseline='middle'; ctx.fillText('¥',0,0);
+      } else {
+        if (this.energyType === 'electric') {
+          ctx.beginPath(); ctx.moveTo(0,-10); ctx.lineTo(6,-3); ctx.lineTo(3,-1); ctx.lineTo(9,9); ctx.lineTo(3,4); ctx.lineTo(7,10); ctx.lineTo(-4,2); ctx.lineTo(0,1); ctx.lineTo(-7,-8); ctx.closePath();
+        } else if (this.energyType === 'heat') {
+          ctx.beginPath(); ctx.moveTo(0,-10); ctx.quadraticCurveTo(8,-6,8,3); ctx.quadraticCurveTo(9,9,4,10); ctx.quadraticCurveTo(-2,12,-6,6); ctx.quadraticCurveTo(-10,1,-4,-6); ctx.quadraticCurveTo(-2,-9,0,-10); ctx.closePath();
         } else {
-          // 能源形状
-          if (this.energyType === 'electric') {
-            ctx.beginPath(); ctx.moveTo(0,-10); ctx.lineTo(6,-3); ctx.lineTo(3,-1); ctx.lineTo(9,9); ctx.lineTo(3,4); ctx.lineTo(7,10); ctx.lineTo(-4,2); ctx.lineTo(0,1); ctx.lineTo(-7,-8); ctx.closePath();
-          } else if (this.energyType === 'heat') {
-            ctx.beginPath(); ctx.moveTo(0,-10); ctx.quadraticCurveTo(8,-6,8,3); ctx.quadraticCurveTo(9,9,4,10); ctx.quadraticCurveTo(-2,12,-6,6); ctx.quadraticCurveTo(-10,1,-4,-6); ctx.quadraticCurveTo(-2,-9,0,-10); ctx.closePath();
-          } else {
-            ctx.beginPath(); ctx.moveTo(0,-10); ctx.bezierCurveTo(6,-5,6,7,0,10); ctx.bezierCurveTo(-6,7,-6,-5,0,-10); ctx.closePath();
-          }
-          ctx.fill(); ctx.stroke();
+          ctx.beginPath(); ctx.moveTo(0,-10); ctx.bezierCurveTo(6,-5,6,7,0,10); ctx.bezierCurveTo(-6,7,-6,-5,0,-10); ctx.closePath();
         }
-        ctx.restore();
+        ctx.fill(); ctx.stroke();
       }
-      draw(ctx) {
-        let c1, c2;
-        if (this.type === 'coin') { c1='255,215,0'; c2='184,134,11'; }
-        else { if(this.energyType==='electric'){c1='255,220,100';c2='255,150,30';} else if(this.energyType==='heat'){c1='255,140,60';c2='200,40,10';} else {c1='120,200,255';c2='30,90,200';} }
-        if (this.trail.length > 1) {
-          ctx.save();
-          for (let i=1;i<this.trail.length;i++) {
-            const a=this.trail[i], b=this.trail[i-1]; const alpha=a.life*0.5*this.brightness; if(alpha<0.02)continue;
-            ctx.strokeStyle=`rgba(${c1},${alpha})`; ctx.lineWidth=this.size*a.life*0.55;
-            ctx.shadowColor=`rgba(${c2},${alpha*0.6})`; ctx.shadowBlur=this.size*1.6;
-            ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(a.x,a.y); ctx.stroke();
-          } ctx.shadowBlur=0; ctx.restore();
-        }
-        const alpha=0.7+this.brightness*0.3; ctx.save(); ctx.globalAlpha=alpha;
-        ctx.shadowColor=`rgba(${c1},${alpha})`; ctx.shadowBlur=this.size*2.5;
-        ctx.fillStyle=`rgba(${c1},${alpha})`; ctx.strokeStyle=`rgba(${c2},0.9)`; ctx.lineWidth=0.9;
-        this.drawShape(ctx, this.x, this.y, this.size, alpha);
-        ctx.shadowBlur=0; ctx.restore();
-      }
-    }
-
-    // ----- 云烟粒子 (CO2) -----
-    class SmokeParticle {
-      constructor(pipeIdx) { this.pipeIdx = pipeIdx; this.reset(true); }
-      reset(init = false) {
-        this.x = pipeY[this.pipeIdx] ? Math.random()*width : 0;
-        this.y = init ? Math.random()*height*0.8 : pipeY[this.pipeIdx] - 10 - Math.random()*30;
-        this.size = 8 + Math.random()*18;
-        this.speed = 0.3 + Math.random()*0.7;
-        this.wobble = Math.random()*Math.PI*2;
-        this.life = 0.6 + Math.random()*0.9;
-        this.opacity = 0.25 + Math.random()*0.35;
-      }
-      update(t, emissionRate) {
-        this.y -= this.speed * (0.5 + emissionRate);
-        this.x += Math.sin(t*0.5 + this.wobble) * 0.6;
-        this.life -= 0.003;
-        if (this.y < -40 || this.life <= 0) {
-          this.reset();
-          this.y = pipeY[this.pipeIdx] - 10 - Math.random()*25;
-          this.life = 0.6 + Math.random()*0.8;
-        }
-      }
-      draw(ctx) {
-        const alpha = this.opacity * this.life;
-        ctx.save(); ctx.globalAlpha = alpha;
-        const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
-        grad.addColorStop(0, 'rgba(255,255,255,0.9)');
-        grad.addColorStop(0.6, 'rgba(220,220,220,0.5)');
-        grad.addColorStop(1, 'rgba(200,200,200,0)');
-        ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill();
-        ctx.restore();
-      }
-    }
-
-    function initParticles() {
-      particles = [];
-      for (let p = 0; p < pipeCount; p++) {
-        for (let i = 0; i < PARTICLES_PER_PIPE; i++) particles.push(new Particle(p, 'energy'));
-        for (let i = 0; i < COINS_PER_PIPE; i++) particles.push(new Particle(p, 'coin'));
-      }
-      smokeParticles = [];
-      for (let i = 0; i < MAX_SMOKE; i++) smokeParticles.push(new SmokeParticle(i % pipeCount));
-    }
-
-    // ----- 脉冲 -----
-    class Pulse {
-      constructor(x,y,type,strength=1){ this.x=x;this.y=y;this.type=type; this.radius=4;this.maxR=22+Math.random()*40*strength; this.speed=3+Math.random()*5;this.life=1.0;this.decay=0.02+Math.random()*0.035; }
-      update(){ this.radius+=this.speed; this.life-=this.decay; if(this.life<0)this.life=0; }
-      draw(ctx){
-        if(this.life<=0||this.radius>this.maxR)return; const alpha=this.life*0.6; let color;
-        if(this.type==='electric')color='100,180,255'; else if(this.type==='heat')color='255,120,80'; else color='80,180,255';
-        ctx.save(); ctx.globalAlpha=alpha; ctx.strokeStyle=`rgba(${color},${alpha})`; ctx.lineWidth=1.4*this.life;
-        ctx.shadowColor=`rgba(${color},${alpha*0.8})`; ctx.shadowBlur=7;
-        ctx.beginPath(); ctx.arc(this.x,this.y,this.radius,0,Math.PI*2); ctx.stroke(); ctx.restore();
-      }
-      isAlive(){return this.life>0.01&&this.radius<this.maxR;}
-    }
-
-    // ----- 绘制函数 -----
-    function drawBackground(ctx) {
-      const grad=ctx.createLinearGradient(0,0,0,height); grad.addColorStop(0,'#070b17'); grad.addColorStop(0.5,'#0c1125'); grad.addColorStop(1,'#070b17');
-      ctx.fillStyle=grad; ctx.fillRect(0,0,width,height);
-      ctx.save(); ctx.globalAlpha=0.05; ctx.strokeStyle='#4a6490'; ctx.lineWidth=0.4;
-      for(let x=0;x<width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,height);ctx.stroke();}
-      for(let y=0;y<height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(width,y);ctx.stroke();}
       ctx.restore();
     }
-
-    function drawPipe(ctx, centerY, outerR, innerR, pipeIdx) {
-      const type = PIPE_TYPE[pipeIdx];
-      const outTop=centerY-outerR, outBottom=centerY+outerR;
-      ctx.save();
-      ctx.beginPath(); ctx.moveTo(0,outTop+12); ctx.lineTo(width,outTop+12); ctx.arcTo(width+12,outTop+12,width+12,outTop,12); ctx.lineTo(width+12,outBottom-12); ctx.arcTo(width+12,outBottom,width,outBottom,12); ctx.lineTo(0,outBottom); ctx.arcTo(-12,outBottom,-12,outBottom-12,12); ctx.lineTo(-12,outTop+12); ctx.arcTo(-12,outTop,0,outTop,12); ctx.closePath();
-      const outerGrad=ctx.createLinearGradient(0,outTop,0,outBottom); outerGrad.addColorStop(0,'#4e525b'); outerGrad.addColorStop(0.5,'#272b32'); outerGrad.addColorStop(1,'#4e525b');
-      ctx.fillStyle=outerGrad; ctx.fill(); ctx.restore();
-
-      const inTop=centerY-innerR, inBottom=centerY+innerR;
-      ctx.save();
-      ctx.beginPath(); ctx.moveTo(2,inTop+8); ctx.lineTo(width-2,inTop+8); ctx.arcTo(width+8,inTop+8,width+8,inTop,8); ctx.lineTo(width+8,inBottom-8); ctx.arcTo(width+8,inBottom,width-2,inBottom,8); ctx.lineTo(2,inBottom); ctx.arcTo(-8,inBottom,-8,inBottom-8,8); ctx.lineTo(-8,inTop+8); ctx.arcTo(-8,inTop,2,inTop,8); ctx.closePath();
-      let innerGrad;
-      if(type==='electric'){ innerGrad=ctx.createLinearGradient(0,inTop,0,inBottom); innerGrad.addColorStop(0,'#f0b870'); innerGrad.addColorStop(0.5,'#b87030'); innerGrad.addColorStop(1,'#f0b870'); }
-      else if(type==='heat'){ innerGrad=ctx.createLinearGradient(0,inTop,0,inBottom); innerGrad.addColorStop(0,'#e8855a'); innerGrad.addColorStop(0.5,'#a03020'); innerGrad.addColorStop(1,'#e8855a'); }
-      else { innerGrad=ctx.createLinearGradient(0,inTop,0,inBottom); innerGrad.addColorStop(0,'#6da9d0'); innerGrad.addColorStop(0.5,'#1e4e70'); innerGrad.addColorStop(1,'#6da9d0'); }
-      ctx.fillStyle=innerGrad; ctx.fill(); ctx.restore();
+    draw(ctx) {
+      let c1, c2;
+      if (this.type === 'coin') { c1='255,215,0'; c2='184,134,11'; }
+      else { if(this.energyType==='electric'){c1='255,220,100';c2='255,150,30';} else if(this.energyType==='heat'){c1='255,140,60';c2='200,40,10';} else {c1='120,200,255';c2='30,90,200';} }
+      if (this.trail.length > 1) {
+        ctx.save();
+        for (let i=1;i<this.trail.length;i++) {
+          const a=this.trail[i], b=this.trail[i-1]; const alpha=a.life*0.5*this.brightness; if(alpha<0.02)continue;
+          ctx.strokeStyle=`rgba(${c1},${alpha})`; ctx.lineWidth=this.size*a.life*0.55;
+          ctx.shadowColor=`rgba(${c2},${alpha*0.6})`; ctx.shadowBlur=this.size*1.6;
+          ctx.beginPath(); ctx.moveTo(b.x,b.y); ctx.lineTo(a.x,a.y); ctx.stroke();
+        } ctx.shadowBlur=0; ctx.restore();
+      }
+      const alpha=0.7+this.brightness*0.3; ctx.save(); ctx.globalAlpha=alpha;
+      ctx.shadowColor=`rgba(${c1},${alpha})`; ctx.shadowBlur=this.size*2.5;
+      ctx.fillStyle=`rgba(${c1},${alpha})`; ctx.strokeStyle=`rgba(${c2},0.9)`; ctx.lineWidth=0.9;
+      this.drawShape(ctx, this.x, this.y, this.size, alpha);
+      ctx.shadowBlur=0; ctx.restore();
     }
+  }
 
-    function drawLabels(ctx) {
-      ctx.save(); ctx.font='bold 13px "Microsoft YaHei", sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
-      for(let i=0;i<pipeCount;i++){ ctx.fillStyle='#ffffff'; ctx.shadowColor='#000000'; ctx.shadowBlur=4; ctx.fillText(PIPE_LABELS[i], 16, pipeY[i]); }
+  // ----- 云烟粒子 (CO2) -----
+  class SmokeParticle {
+    constructor(pipeIdx) { this.pipeIdx = pipeIdx; this.reset(true); }
+    reset(init = false) {
+      this.x = pipeY[this.pipeIdx] ? Math.random()*width : 0;
+      this.y = init ? Math.random()*height*0.8 : pipeY[this.pipeIdx] - 10 - Math.random()*30;
+      this.size = 8 + Math.random()*18;
+      this.speed = 0.3 + Math.random()*0.7;
+      this.wobble = Math.random()*Math.PI*2;
+      this.life = 0.6 + Math.random()*0.9;
+      this.opacity = 0.25 + Math.random()*0.35;
+    }
+    update(t, emissionRate) {
+      this.y -= this.speed * (0.5 + emissionRate);
+      this.x += Math.sin(t*0.5 + this.wobble) * 0.6;
+      this.life -= 0.003;
+      if (this.y < -40 || this.life <= 0) {
+        this.reset();
+        this.y = pipeY[this.pipeIdx] - 10 - Math.random()*25;
+        this.life = 0.6 + Math.random()*0.8;
+      }
+    }
+    draw(ctx) {
+      const alpha = this.opacity * this.life;
+      ctx.save(); ctx.globalAlpha = alpha;
+      const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
+      grad.addColorStop(0, 'rgba(255,255,255,0.9)');
+      grad.addColorStop(0.6, 'rgba(220,220,220,0.5)');
+      grad.addColorStop(1, 'rgba(200,200,200,0)');
+      ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill();
       ctx.restore();
     }
+  }
 
-    // 更新面板HTML
-    function updateDashboard() {
-      const d = data;
-      const totalCO2 = d.elecCO2 + d.heatCO2 + d.waterCO2;
-      const totalCost = d.elecCost + d.heatCost + d.waterCost;
-      dashboardEl.innerHTML = `
-        <div class="card"><span class="label">⚡电能</span><span class="value elec">${d.elecPower.toFixed(1)}</span><span class="unit">kW</span> <span class="value cost-color">¥${d.elecCost.toFixed(2)}</span> <span class="value carbon-color">${d.elecCO2.toFixed(2)}kg/h</span></div>
-        <div class="card"><span class="label">🔥热能</span><span class="value heat">${d.heatPower.toFixed(1)}</span><span class="unit">kW</span> <span class="value cost-color">¥${d.heatCost.toFixed(2)}</span> <span class="value carbon-color">${d.heatCO2.toFixed(2)}kg/h</span></div>
-        <div class="card"><span class="label">💧水流</span><span class="value water">${d.waterFlow.toFixed(1)}</span><span class="unit">L/min</span> <span class="value cost-color">¥${d.waterCost.toFixed(2)}</span> <span class="value carbon-color">${d.waterCO2.toFixed(2)}kg/h</span></div>
-        <div class="card total-row"><span class="label">🌿总CO₂</span><span class="value carbon-color">${totalCO2.toFixed(2)}</span><span class="unit">kg/h</span> <span class="label">💰总费用</span><span class="value cost-color">¥${totalCost.toFixed(2)}</span></div>
-        <div class="card"><span class="label">📊状态</span><span class="value" style="color:#7fdb6a;">● 运行中</span></div>
-      `;
-      if (!globalOn) {
-        dashboardEl.querySelector('.card:last-child .value').innerHTML = '<span style="color:#e05555;">● 已停止</span>';
-      }
+  function initParticles() {
+    particles = [];
+    for (let p = 0; p < pipeCount; p++) {
+      for (let i = 0; i < PARTICLES_PER_PIPE; i++) particles.push(new Particle(p, 'energy'));
+      for (let i = 0; i < COINS_PER_PIPE; i++) particles.push(new Particle(p, 'coin'));
+    }
+    smokeParticles = [];
+    for (let i = 0; i < MAX_SMOKE; i++) smokeParticles.push(new SmokeParticle(i % pipeCount));
+  }
+
+  // ----- 脉冲 -----
+  class Pulse {
+    constructor(x,y,type,strength=1){ this.x=x;this.y=y;this.type=type; this.radius=4;this.maxR=22+Math.random()*40*strength; this.speed=3+Math.random()*5;this.life=1.0;this.decay=0.02+Math.random()*0.035; }
+    update(){ this.radius+=this.speed; this.life-=this.decay; if(this.life<0)this.life=0; }
+    draw(ctx){
+      if(this.life<=0||this.radius>this.maxR)return; const alpha=this.life*0.6; let color;
+      if(this.type==='electric')color='100,180,255'; else if(this.type==='heat')color='255,120,80'; else color='80,180,255';
+      ctx.save(); ctx.globalAlpha=alpha; ctx.strokeStyle=`rgba(${color},${alpha})`; ctx.lineWidth=1.4*this.life;
+      ctx.shadowColor=`rgba(${color},${alpha*0.8})`; ctx.shadowBlur=7;
+      ctx.beginPath(); ctx.arc(this.x,this.y,this.radius,0,Math.PI*2); ctx.stroke(); ctx.restore();
+    }
+    isAlive(){return this.life>0.01&&this.radius<this.maxR;}
+  }
+
+  // ----- 绘制函数 -----
+  function drawBackground(ctx) {
+    const grad=ctx.createLinearGradient(0,0,0,height); grad.addColorStop(0,'#070b17'); grad.addColorStop(0.5,'#0c1125'); grad.addColorStop(1,'#070b17');
+    ctx.fillStyle=grad; ctx.fillRect(0,0,width,height);
+    ctx.save(); ctx.globalAlpha=0.05; ctx.strokeStyle='#4a6490'; ctx.lineWidth=0.4;
+    for(let x=0;x<width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,height);ctx.stroke();}
+    for(let y=0;y<height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(width,y);ctx.stroke();}
+    ctx.restore();
+  }
+
+  function drawPipe(ctx, centerY, outerR, innerR, pipeIdx) {
+    const type = PIPE_TYPE[pipeIdx];
+    const outTop=centerY-outerR, outBottom=centerY+outerR;
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(0,outTop+12); ctx.lineTo(width,outTop+12); ctx.arcTo(width+12,outTop+12,width+12,outTop,12); ctx.lineTo(width+12,outBottom-12); ctx.arcTo(width+12,outBottom,width,outBottom,12); ctx.lineTo(0,outBottom); ctx.arcTo(-12,outBottom,-12,outBottom-12,12); ctx.lineTo(-12,outTop+12); ctx.arcTo(-12,outTop,0,outTop,12); ctx.closePath();
+    const outerGrad=ctx.createLinearGradient(0,outTop,0,outBottom); outerGrad.addColorStop(0,'#4e525b'); outerGrad.addColorStop(0.5,'#272b32'); outerGrad.addColorStop(1,'#4e525b');
+    ctx.fillStyle=outerGrad; ctx.fill(); ctx.restore();
+
+    const inTop=centerY-innerR, inBottom=centerY+innerR;
+    ctx.save();
+    ctx.beginPath(); ctx.moveTo(2,inTop+8); ctx.lineTo(width-2,inTop+8); ctx.arcTo(width+8,inTop+8,width+8,inTop,8); ctx.lineTo(width+8,inBottom-8); ctx.arcTo(width+8,inBottom,width-2,inBottom,8); ctx.lineTo(2,inBottom); ctx.arcTo(-8,inBottom,-8,inBottom-8,8); ctx.lineTo(-8,inTop+8); ctx.arcTo(-8,inTop,2,inTop,8); ctx.closePath();
+    let innerGrad;
+    if(type==='electric'){ innerGrad=ctx.createLinearGradient(0,inTop,0,inBottom); innerGrad.addColorStop(0,'#f0b870'); innerGrad.addColorStop(0.5,'#b87030'); innerGrad.addColorStop(1,'#f0b870'); }
+    else if(type==='heat'){ innerGrad=ctx.createLinearGradient(0,inTop,0,inBottom); innerGrad.addColorStop(0,'#e8855a'); innerGrad.addColorStop(0.5,'#a03020'); innerGrad.addColorStop(1,'#e8855a'); }
+    else { innerGrad=ctx.createLinearGradient(0,inTop,0,inBottom); innerGrad.addColorStop(0,'#6da9d0'); innerGrad.addColorStop(0.5,'#1e4e70'); innerGrad.addColorStop(1,'#6da9d0'); }
+    ctx.fillStyle=innerGrad; ctx.fill(); ctx.restore();
+  }
+
+  function drawLabels(ctx) {
+    ctx.save(); ctx.font='bold 13px "Microsoft YaHei", sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
+    for(let i=0;i<pipeCount;i++){ ctx.fillStyle='#ffffff'; ctx.shadowColor='#000000'; ctx.shadowBlur=4; ctx.fillText(PIPE_LABELS[i], 16, pipeY[i]); }
+    ctx.restore();
+  }
+
+  // 更新面板HTML
+  function updateDashboard() {
+    const d = data;
+    const totalCO2 = d.elecCO2 + d.heatCO2 + d.waterCO2;
+    const totalCost = d.elecCost + d.heatCost + d.waterCost;
+    dashboardEl.innerHTML = `
+      <div class="card"><span class="label">⚡电能</span><span class="value elec">${d.elecPower.toFixed(1)}</span><span class="unit">kW</span> <span class="value cost-color">¥${d.elecCost.toFixed(2)}</span> <span class="value carbon-color">${d.elecCO2.toFixed(2)}kg/h</span></div>
+      <div class="card"><span class="label">🔥热能</span><span class="value heat">${d.heatPower.toFixed(1)}</span><span class="unit">kW</span> <span class="value cost-color">¥${d.heatCost.toFixed(2)}</span> <span class="value carbon-color">${d.heatCO2.toFixed(2)}kg/h</span></div>
+      <div class="card"><span class="label">💧水流</span><span class="value water">${d.waterFlow.toFixed(1)}</span><span class="unit">L/min</span> <span class="value cost-color">¥${d.waterCost.toFixed(2)}</span> <span class="value carbon-color">${d.waterCO2.toFixed(2)}kg/h</span></div>
+      <div class="card total-row"><span class="label">🌿总CO₂</span><span class="value carbon-color">${totalCO2.toFixed(2)}</span><span class="unit">kg/h</span> <span class="label">💰总费用</span><span class="value cost-color">¥${totalCost.toFixed(2)}</span></div>
+      <div class="card"><span class="label">📊状态</span><span class="value" style="color:#7fdb6a;">● 运行中</span></div>
+    `;
+    if (!globalOn) {
+      dashboardEl.querySelector('.card:last-child .value').innerHTML = '<span style="color:#e05555;">● 已停止</span>';
+    }
+  }
+
+  // ----- 主循环 -----
+  function animate(ts) {
+    time = ts * 0.001;
+    ctx.clearRect(0,0,width,height);
+    intensity += (targetIntensity - intensity) * 0.1;
+    mouseX += (targetMouseX - mouseX) * 0.15;
+    mouseY += (targetMouseY - mouseY) * 0.15;
+
+    data.elecPower = globalOn ? (8 + intensity*10) : 0;
+    data.heatPower = globalOn ? (5 + intensity*8) : 0;
+    data.waterFlow = globalOn ? (3 + intensity*6) : 0;
+    data.elecCost = data.elecPower * 0.75;
+    data.heatCost = data.heatPower * 0.55;
+    data.waterCost = data.waterFlow * 0.004 * 60;
+    data.elecCO2 = data.elecPower * 0.5;
+    data.heatCO2 = data.heatPower * 0.25;
+    data.waterCO2 = data.waterFlow * 0.001 * 0.2 * 60;
+
+    drawBackground(ctx);
+    for (let i=0;i<pipeCount;i++) drawPipe(ctx, pipeY[i], pipeOuterR, pipeInnerR, i);
+
+    const coinSpeed = globalOn ? (1.2 + (data.elecCost+data.heatCost+data.waterCost)*0.25) : 0.05;
+    for (let p of particles) {
+      p.update(time, intensity, globalOn, coinSpeed);
+      p.draw(ctx);
     }
 
-    // ----- 主循环 -----
-    function animate(ts) {
-      time = ts * 0.001;
-      ctx.clearRect(0,0,width,height);
-      intensity += (targetIntensity - intensity) * 0.1;
-      mouseX += (targetMouseX - mouseX) * 0.15;
-      mouseY += (targetMouseY - mouseY) * 0.15;
+    const emissionRates = [data.elecCO2 / 10, data.heatCO2 / 8, data.waterCO2 / 3];
+    for (let s of smokeParticles) {
+      const rate = emissionRates[s.pipeIdx] || 0.2;
+      s.update(time, Math.min(2.0, rate));
+      s.draw(ctx);
+    }
 
-      // 计算数据
-      data.elecPower = globalOn ? (8 + intensity*10) : 0;
-      data.heatPower = globalOn ? (5 + intensity*8) : 0;
-      data.waterFlow = globalOn ? (3 + intensity*6) : 0;
-      data.elecCost = data.elecPower * 0.75;
-      data.heatCost = data.heatPower * 0.55;
-      data.waterCost = data.waterFlow * 0.004 * 60;
-      data.elecCO2 = data.elecPower * 0.5;
-      data.heatCO2 = data.heatPower * 0.25;
-      data.waterCO2 = data.waterFlow * 0.001 * 0.2 * 60;
+    if (globalOn && Math.random()<0.03 && pulses.length<MAX_PULSES) {
+      const idx = Math.floor(Math.random()*pipeCount);
+      pulses.push(new Pulse(Math.random()*width, pipeY[idx], PIPE_TYPE[idx], 0.5));
+    }
+    if (mousePressed && mouseX>0 && mouseY>0 && mouseX<width && mouseY<height && Math.random()<0.35 && pulses.length<MAX_PULSES) {
+      let ni=0, md=Math.abs(mouseY-pipeY[0]);
+      for(let i=1;i<pipeCount;i++){const d=Math.abs(mouseY-pipeY[i]); if(d<md){md=d;ni=i;}}
+      if(md<pipeOuterR+20) pulses.push(new Pulse(mouseX, mouseY, PIPE_TYPE[ni], 0.8));
+    }
+    for (let p of pulses) p.update();
+    pulses = pulses.filter(p=>p.isAlive());
+    for (let p of pulses) p.draw(ctx);
 
-      drawBackground(ctx);
-      for (let i=0;i<pipeCount;i++) drawPipe(ctx, pipeY[i], pipeOuterR, pipeInnerR, i);
-
-      // 金币速度与总费用挂钩
-      const coinSpeed = globalOn ? (1.2 + (data.elecCost+data.heatCost+data.waterCost)*0.25) : 0.05;
-      for (let p of particles) {
-        p.update(time, intensity, globalOn, coinSpeed);
-        p.draw(ctx);
-      }
-
-      // 云烟 (每个管道根据排放率生成)
-      const emissionRates = [
-        data.elecCO2 / 10,  // 归一化因子
-        data.heatCO2 / 8,
-        data.waterCO2 / 3
-      ];
-      for (let s of smokeParticles) {
-        const rate = emissionRates[s.pipeIdx] || 0.2;
-        s.update(time, Math.min(2.0, rate));
-        s.draw(ctx);
-      }
-
-      // 脉冲
-      if (globalOn && Math.random()<0.03 && pulses.length<MAX_PULSES) {
-        const idx = Math.floor(Math.random()*pipeCount);
-        pulses.push(new Pulse(Math.random()*width, pipeY[idx], PIPE_TYPE[idx], 0.5));
-      }
-      if (mousePressed && mouseX>0 && mouseY>0 && mouseX<width && mouseY<height && Math.random()<0.35 && pulses.length<MAX_PULSES) {
-        let ni=0, md=Math.abs(mouseY-pipeY[0]);
-        for(let i=1;i<pipeCount;i++){const d=Math.abs(mouseY-pipeY[i]); if(d<md){md=d;ni=i;}}
-        if(md<pipeOuterR+20) pulses.push(new Pulse(mouseX, mouseY, PIPE_TYPE[ni], 0.8));
-      }
-      for (let p of pulses) p.update();
-      pulses = pulses.filter(p=>p.isAlive());
-      for (let p of pulses) p.draw(ctx);
-
-      drawLabels(ctx);
-      
-      // 鼠标高亮
-      if (mouseX>0 && mouseY>0 && mouseX<width && mouseY<height) {
-        for(let i=0;i<pipeCount;i++) {
-          if(Math.abs(mouseY-pipeY[i]) < pipeOuterR+12) {
-            ctx.save(); ctx.globalAlpha=0.15;
-            const hl=ctx.createLinearGradient(0,pipeY[i]-pipeOuterR-6,0,pipeY[i]+pipeOuterR+6);
-            hl.addColorStop(0,'rgba(180,200,255,0)'); hl.addColorStop(0.5,'rgba(180,200,255,0.7)'); hl.addColorStop(1,'rgba(180,200,255,0)');
-            ctx.fillStyle=hl; ctx.fillRect(0,pipeY[i]-pipeOuterR-6,width,(pipeOuterR+6)*2); ctx.restore(); break;
-          }
+    drawLabels(ctx);
+    
+    if (mouseX>0 && mouseY>0 && mouseX<width && mouseY<height) {
+      for(let i=0;i<pipeCount;i++) {
+        if(Math.abs(mouseY-pipeY[i]) < pipeOuterR+12) {
+          ctx.save(); ctx.globalAlpha=0.15;
+          const hl=ctx.createLinearGradient(0,pipeY[i]-pipeOuterR-6,0,pipeY[i]+pipeOuterR+6);
+          hl.addColorStop(0,'rgba(180,200,255,0)'); hl.addColorStop(0.5,'rgba(180,200,255,0.7)'); hl.addColorStop(1,'rgba(180,200,255,0)');
+          ctx.fillStyle=hl; ctx.fillRect(0,pipeY[i]-pipeOuterR-6,width,(pipeOuterR+6)*2); ctx.restore(); break;
         }
       }
-
-      updateDashboard();
-      requestAnimationFrame(animate);
     }
 
-    // ----- 事件 -----
-    function getPos(e){const r=container.getBoundingClientRect(); return{x:e.clientX-r.left,y:e.clientY-r.top};}
-    container.addEventListener('mousemove',e=>{const p=getPos(e);targetMouseX=p.x;targetMouseY=p.y;});
-    container.addEventListener('mousedown',e=>{mousePressed=true;const p=getPos(e);targetMouseX=p.x;targetMouseY=p.y;mouseX=p.x;mouseY=p.y;for(let i=0;i<4;i++)pulses.push(new Pulse(p.x+(Math.random()-0.5)*25,p.y+(Math.random()-0.5)*20,'electric',1.2));hintEl.style.opacity='0';});
-    container.addEventListener('mouseup',()=>{mousePressed=false;setTimeout(()=>{if(!mousePressed)hintEl.style.opacity='1';},2000);});
-    container.addEventListener('mouseleave',()=>{mousePressed=false;targetMouseX=-200;targetMouseY=-200;setTimeout(()=>{hintEl.style.opacity='1';},2000);});
-    container.addEventListener('click',e=>{const p=getPos(e);let on=false;for(let i=0;i<pipeCount;i++)if(Math.abs(p.y-pipeY[i])<pipeOuterR+14)on=true;if(on){globalOn=!globalOn;if(!globalOn)targetIntensity=0;else if(targetIntensity<0.3)targetIntensity=1.0;}});
-    container.addEventListener('wheel',e=>{e.preventDefault();if(!globalOn){globalOn=true;targetIntensity=0.5;}targetIntensity=Math.max(0.2,Math.min(2.5,targetIntensity-e.deltaY*0.005));},{passive:false});
-    container.addEventListener('touchmove',e=>{e.preventDefault();const p=getPos(e.touches[0]);targetMouseX=p.x;targetMouseY=p.y;if(mousePressed&&Math.random()<0.3)pulses.push(new Pulse(p.x,p.y,'electric',0.7));},{passive:false});
-    container.addEventListener('touchstart',e=>{e.preventDefault();mousePressed=true;const p=getPos(e.touches[0]);targetMouseX=p.x;targetMouseY=p.y;mouseX=p.x;mouseY=p.y;let on=false;for(let i=0;i<pipeCount;i++)if(Math.abs(p.y-pipeY[i])<pipeOuterR+14)on=true;if(on){globalOn=!globalOn;if(!globalOn)targetIntensity=0;else if(targetIntensity<0.3)targetIntensity=1.0;}hintEl.style.opacity='0';},{passive:false});
-    container.addEventListener('touchend',()=>{mousePressed=false;setTimeout(()=>{hintEl.style.opacity='1';},2000);});
-    window.addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();globalOn=!globalOn;if(!globalOn)targetIntensity=0;else if(targetIntensity<0.3)targetIntensity=1.0;}else if(e.key==='ArrowUp'){e.preventDefault();if(!globalOn)globalOn=true;targetIntensity=Math.min(2.5,targetIntensity+0.25);}else if(e.key==='ArrowDown'){e.preventDefault();targetIntensity=Math.max(0.2,targetIntensity-0.25);if(targetIntensity<0.25)globalOn=false;}});
-    window.addEventListener('resize',()=>{clearTimeout(window.resizeTimer);window.resizeTimer=setTimeout(()=>resize(),250);});
-    resize();
+    updateDashboard();
     requestAnimationFrame(animate);
-  })();
-</script>
-</body>
-</html>
+  }
+
+  // ----- 事件 -----
+  function getPos(e){const r=container.getBoundingClientRect(); return{x:e.clientX-r.left,y:e.clientY-r.top};}
+  container.addEventListener('mousemove',e=>{const p=getPos(e);targetMouseX=p.x;targetMouseY=p.y;});
+  container.addEventListener('mousedown',e=>{mousePressed=true;const p=getPos(e);targetMouseX=p.x;targetMouseY=p.y;mouseX=p.x;mouseY=p.y;for(let i=0;i<4;i++)pulses.push(new Pulse(p.x+(Math.random()-0.5)*25,p.y+(Math.random()-0.5)*20,'electric',1.2));hintEl.style.opacity='0';});
+  container.addEventListener('mouseup',()=>{mousePressed=false;setTimeout(()=>{if(!mousePressed)hintEl.style.opacity='1';},2000);});
+  container.addEventListener('mouseleave',()=>{mousePressed=false;targetMouseX=-200;targetMouseY=-200;setTimeout(()=>{hintEl.style.opacity='1';},2000);});
+  container.addEventListener('click',e=>{const p=getPos(e);let on=false;for(let i=0;i<pipeCount;i++)if(Math.abs(p.y-pipeY[i])<pipeOuterR+14)on=true;if(on){globalOn=!globalOn;if(!globalOn)targetIntensity=0;else if(targetIntensity<0.3)targetIntensity=1.0;}});
+  container.addEventListener('wheel',e=>{e.preventDefault();if(!globalOn){globalOn=true;targetIntensity=0.5;}targetIntensity=Math.max(0.2,Math.min(2.5,targetIntensity-e.deltaY*0.005));},{passive:false});
+  container.addEventListener('touchmove',e=>{e.preventDefault();const p=getPos(e.touches[0]);targetMouseX=p.x;targetMouseY=p.y;if(mousePressed&&Math.random()<0.3)pulses.push(new Pulse(p.x,p.y,'electric',0.7));},{passive:false});
+  container.addEventListener('touchstart',e=>{e.preventDefault();mousePressed=true;const p=getPos(e.touches[0]);targetMouseX=p.x;targetMouseY=p.y;mouseX=p.x;mouseY=p.y;let on=false;for(let i=0;i<pipeCount;i++)if(Math.abs(p.y-pipeY[i])<pipeOuterR+14)on=true;if(on){globalOn=!globalOn;if(!globalOn)targetIntensity=0;else if(targetIntensity<0.3)targetIntensity=1.0;}hintEl.style.opacity='0';},{passive:false});
+  container.addEventListener('touchend',()=>{mousePressed=false;setTimeout(()=>{hintEl.style.opacity='1';},2000);});
+  window.addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();globalOn=!globalOn;if(!globalOn)targetIntensity=0;else if(targetIntensity<0.3)targetIntensity=1.0;}else if(e.key==='ArrowUp'){e.preventDefault();if(!globalOn)globalOn=true;targetIntensity=Math.min(2.5,targetIntensity+0.25);}else if(e.key==='ArrowDown'){e.preventDefault();targetIntensity=Math.max(0.2,targetIntensity-0.25);if(targetIntensity<0.25)globalOn=false;}});
+  window.addEventListener('resize',()=>{clearTimeout(window.resizeTimer);window.resizeTimer=setTimeout(()=>resize(),250);});
+  resize();
+  requestAnimationFrame(animate);
+})();
 </script>
 
-<!-- 注册 Service Worker（用于离线缓存，可选但推荐） -->
+<!-- 注册 Service Worker -->
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
       navigator.serviceWorker.register('sw.js').then(reg => {
-        console.log('Service Worker 注册成功', reg);
+        console.log('Service Worker 注册成功');
       }).catch(err => {
         console.log('Service Worker 注册失败', err);
       });
@@ -441,4 +386,4 @@
   }
 </script>
 </body>
-	</html>
+</html>
