@@ -3,46 +3,75 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no, viewport-fit=cover">
-  <title>多能源流 · 电能·热能·水流·现金流·碳排放</title>
-  
-  <!-- PWA 清单文件 -->
+  <title>多能源流 · 冷塔云烟</title>
   <link rel="manifest" href="manifest.json">
-  
-  <!-- iOS Safari 全屏支持 -->
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
   <meta name="apple-mobile-web-app-title" content="能源流">
   <link rel="apple-touch-icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>⚡</text></svg>">
-  
-  <!-- 主题颜色 -->
   <meta name="theme-color" content="#0a0e17">
-  
   <style>
     * { margin:0; padding:0; box-sizing:border-box; }
-    body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:#0a0e17; font-family:system-ui,'Segoe UI',sans-serif; }
-    .container { position:relative; width:920px; height:640px; border-radius:24px; overflow:hidden; box-shadow:0 0 70px rgba(0,160,255,0.4),0 20px 50px rgba(0,0,0,0.8); background:#0d1020; cursor:pointer; }
+    body { display:flex; align-items:center; justify-content:center; min-height:100vh; background:#0a0e17; font-family:system-ui,'Segoe UI',sans-serif; touch-action: none; }
+    .container { position:relative; width:100vw; height:100vw; max-width:920px; max-height:640px; border-radius:24px; overflow:hidden; box-shadow:0 0 70px rgba(0,160,255,0.4),0 20px 50px rgba(0,0,0,0.8); background:#0d1020; cursor:pointer; }
     canvas { display:block; width:100%; height:100%; }
-    .dashboard { position:absolute; top:16px; right:18px; display:flex; flex-direction:column; gap:5px; pointer-events:none; z-index:10; font-size:11px; letter-spacing:0.4px; }
-    .card { background:rgba(8,12,24,0.8); border:1px solid #2e4a70; border-radius:8px; padding:5px 10px; backdrop-filter:blur(10px); display:flex; flex-wrap:wrap; align-items:baseline; gap:4px; }
+    .dashboard {
+      position:absolute; top:16px; right:18px; display:flex; flex-direction:column; gap:5px; pointer-events:none; z-index:10;
+      font-size:clamp(8px, 1.4vw, 11px); letter-spacing:0.4px;
+    }
+    .card {
+      background:rgba(8,12,24,0.85); border:1px solid #2e4a70; border-radius:8px; padding:4px 8px;
+      backdrop-filter:blur(10px); display:flex; flex-wrap:wrap; align-items:baseline; gap:4px;
+    }
     .label { color:#a0bcd8; }
     .value { font-weight:700; }
-    .unit { color:#8899aa; font-size:10px; }
+    .unit { color:#8899aa; font-size:0.8em; }
     .elec { color:#ffb347; text-shadow:0 0 8px #ff9900; }
     .heat { color:#ff6b6b; text-shadow:0 0 8px #ff4444; }
     .water { color:#5aa9ff; text-shadow:0 0 8px #3399ff; }
     .cost-color { color:#ffd966; }
     .carbon-color { color:#8bc34a; }
     .total-row { border-top:1px solid #2e4a70; margin-top:4px; padding-top:5px; }
-    .hint { position:absolute; bottom:14px; left:50%; transform:translateX(-50%); color:#8899bb; font-size:12px; letter-spacing:1.5px; pointer-events:none; text-shadow:0 0 10px #3366aa; animation:softPulse 2.8s infinite; white-space:nowrap; }
+    .hint {
+      position:absolute; bottom:14px; left:50%; transform:translateX(-50%);
+      color:#8899bb; font-size:clamp(9px, 1.5vw, 12px); letter-spacing:1.5px; pointer-events:none;
+      text-shadow:0 0 10px #3366aa; animation:softPulse 2.8s infinite; white-space:nowrap;
+    }
     @keyframes softPulse { 0%,100%{opacity:0.45;} 50%{opacity:1;} }
-    @media (max-width:950px) { .container { width:96vw; height:64vw; } .dashboard { font-size:9px; gap:3px; right:6px; } .card { padding:3px 6px; } .hint { font-size:10px; bottom:8px; } }
+
+    /* 管道开关按钮 */
+    .pipe-controls {
+      position:absolute; left:12px; top:0; bottom:0; display:flex; flex-direction:column;
+      justify-content:space-around; z-index:15; pointer-events:none;
+    }
+    .pipe-btn {
+      width:44px; height:44px; border-radius:50%; background:rgba(20,25,45,0.9);
+      border:2px solid #3a5070; color:#e0e8ff; font-size:18px; display:flex;
+      align-items:center; justify-content:center; pointer-events:auto;
+      transition: all 0.2s; cursor:pointer; backdrop-filter:blur(4px);
+      box-shadow: 0 2px 8px rgba(0,0,0,0.5);
+    }
+    .pipe-btn.active { border-color:#4caf50; box-shadow:0 0 12px rgba(76,175,80,0.6); }
+    .pipe-btn.inactive { border-color:#f44336; opacity:0.7; }
+    .pipe-btn:active { transform:scale(0.92); }
+
+    @media (orientation: landscape) {
+      .container { height:60vh; width:90vw; max-height:600px; max-width:1000px; border-radius:20px; }
+      .pipe-btn { width:38px; height:38px; font-size:16px; }
+      .dashboard { right:10px; top:10px; gap:3px; }
+    }
   </style>
 </head>
 <body>
 <div class="container" id="container">
   <canvas id="energyCanvas"></canvas>
+  <div class="pipe-controls" id="pipeControls">
+    <button class="pipe-btn active" data-pipe="0">⚡</button>
+    <button class="pipe-btn active" data-pipe="1">🔥</button>
+    <button class="pipe-btn active" data-pipe="2">💧</button>
+  </div>
   <div class="dashboard" id="dashboard"></div>
-  <span class="hint" id="hint">⚡点击管道切换 | 滚轮调节强度 | 空格键全局开关</span>
+  <span class="hint" id="hint">上划加速 | 下划减速 | 左侧按钮启停管道</span>
 </div>
 
 <script>
@@ -52,33 +81,38 @@
   const ctx = canvas.getContext('2d');
   const dashboardEl = document.getElementById('dashboard');
   const hintEl = document.getElementById('hint');
+  const pipeControls = document.getElementById('pipeControls');
 
   let width, height, time = 0;
-  let globalOn = true;
   let intensity = 1.0, targetIntensity = 1.0;
-
-  const pipeCount = 3; // 电能、热能、水流
+  const pipeCount = 3;
   const PIPE_TYPE = ['electric', 'heat', 'water'];
   const PIPE_LABELS = ['⚡ 电能', '🔥 热能', '💧 水流'];
   
+  // 每个管道独立开关状态
+  let pipeActive = [true, true, true];
+  
   let pipeY = [], pipeOuterR = 44, pipeInnerR = 28;
   let particles = [];
-  const PARTICLES_PER_PIPE = 45; // 能源粒子数
-  const COINS_PER_PIPE = 18;     // 金币粒子数
+  const PARTICLES_PER_PIPE = 45;
+  const COINS_PER_PIPE = 18;
   let pulses = [], MAX_PULSES = 25;
   
   // 云烟粒子
   let smokeParticles = [];
-  const MAX_SMOKE = 60;
+  const MAX_SMOKE = 70;
   
   let mouseX = -200, mouseY = -200, targetMouseX = -200, targetMouseY = -200;
   let mousePressed = false;
   
-  // 实时数据
+  // 手势相关
+  let touchStartY = 0, touchLastY = 0;
+  let isTouching = false;
+
   let data = {
-    elecPower: 0, heatPower: 0, waterFlow: 0,
-    elecCost: 0, heatCost: 0, waterCost: 0,
-    elecCO2: 0, heatCO2: 0, waterCO2: 0
+    elecPower:0, heatPower:0, waterFlow:0,
+    elecCost:0, heatCost:0, waterCost:0,
+    elecCO2:0, heatCO2:0, waterCO2:0
   };
 
   function resize() {
@@ -89,18 +123,29 @@
     ctx.setTransform(1,0,0,1,0,0); ctx.scale(dpr,dpr);
     
     pipeY = [];
-    const startY = height * 0.2, endY = height * 0.78, step = (endY - startY) / (pipeCount - 1);
+    const startY = height * 0.22, endY = height * 0.78, step = (endY - startY) / (pipeCount - 1);
     for (let i = 0; i < pipeCount; i++) pipeY.push(startY + i * step);
     pipeOuterR = Math.min(48, height * 0.075);
     pipeInnerR = pipeOuterR * 0.62;
+    
+    // 更新按钮位置
+    const btns = document.querySelectorAll('.pipe-btn');
+    btns.forEach((btn, i) => {
+      if (pipeY[i] !== undefined) {
+        btn.style.position = 'absolute';
+        btn.style.top = 'auto';
+        btn.style.bottom = 'auto';
+        btn.style.left = 'auto';
+      }
+    });
     initParticles();
   }
 
-  // ----- 粒子基类 -----
+  // ----- 粒子类 -----
   class Particle {
     constructor(pipeIdx, type) {
       this.pipeIdx = pipeIdx;
-      this.type = type; // 'energy' 或 'coin'
+      this.type = type;
       this.energyType = PIPE_TYPE[pipeIdx];
       this.reset(true);
     }
@@ -118,7 +163,8 @@
       else { this.thermalAmp = 0.3+Math.random()*1.2; this.thermalFreq = 0.04+Math.random()*0.06; }
       this.thermalPhase = Math.random() * Math.PI * 2;
     }
-    update(t, strength, isOn, coinSpeed) {
+    update(t, strength, coinSpeed) {
+      const isActive = pipeActive[this.pipeIdx];
       const yCenter = pipeY[this.pipeIdx];
       const margin = pipeInnerR * 0.72;
       let drift;
@@ -128,9 +174,9 @@
         else if (this.energyType === 'heat') drift = 0.8 + strength * 2.5;
         else drift = 0.9 + strength * 2.9;
       }
-      this.x += isOn ? drift : 0.03;
+      this.x += isActive ? drift : 0.02;
       const jitterY = Math.sin(t * this.thermalFreq + this.thermalPhase) * this.thermalAmp;
-      this.y += jitterY * (isOn ? 1 : 0.4);
+      this.y += jitterY * (isActive ? 1 : 0.3);
       if (this.x > width + 40) { this.x = -40; this.y = yCenter + (Math.random()-0.5)*margin*2; this.trail=[]; }
       else if (this.x < -40) { this.x = width+40; this.y = yCenter + (Math.random()-0.5)*margin*2; this.trail=[]; }
       const top = yCenter - margin, bottom = yCenter + margin;
@@ -142,7 +188,7 @@
       for (let tr of this.trail) tr.life -= 0.12;
       this.trail = this.trail.filter(tr => tr.life > 0);
     }
-    drawShape(ctx, x, y, size, alpha) {
+    drawShape(ctx, x, y, size) {
       const s = size * (this.type === 'coin' ? 3.0 : 2.4);
       ctx.save(); ctx.translate(x, y); ctx.scale(s/24, s/24);
       if (this.type === 'coin') {
@@ -177,31 +223,34 @@
       const alpha=0.7+this.brightness*0.3; ctx.save(); ctx.globalAlpha=alpha;
       ctx.shadowColor=`rgba(${c1},${alpha})`; ctx.shadowBlur=this.size*2.5;
       ctx.fillStyle=`rgba(${c1},${alpha})`; ctx.strokeStyle=`rgba(${c2},0.9)`; ctx.lineWidth=0.9;
-      this.drawShape(ctx, this.x, this.y, this.size, alpha);
+      this.drawShape(ctx, this.x, this.y, this.size);
       ctx.shadowBlur=0; ctx.restore();
     }
   }
 
-  // ----- 云烟粒子 (CO2) -----
+  // ----- 冷却塔云烟粒子 -----
   class SmokeParticle {
-    constructor(pipeIdx) { this.pipeIdx = pipeIdx; this.reset(true); }
+    constructor(pipeIdx, towerX, towerTopY) {
+      this.pipeIdx = pipeIdx;
+      this.towerX = towerX;
+      this.towerTopY = towerTopY;
+      this.reset(true);
+    }
     reset(init = false) {
-      this.x = pipeY[this.pipeIdx] ? Math.random()*width : 0;
-      this.y = init ? Math.random()*height*0.8 : pipeY[this.pipeIdx] - 10 - Math.random()*30;
-      this.size = 8 + Math.random()*18;
-      this.speed = 0.3 + Math.random()*0.7;
-      this.wobble = Math.random()*Math.PI*2;
-      this.life = 0.6 + Math.random()*0.9;
-      this.opacity = 0.25 + Math.random()*0.35;
+      this.x = this.towerX + (Math.random() - 0.5) * 25;
+      this.y = init ? this.towerTopY + Math.random() * 20 : this.towerTopY + Math.random() * 10;
+      this.size = 6 + Math.random() * 16;
+      this.speed = 0.4 + Math.random() * 0.8;
+      this.wobble = Math.random() * Math.PI * 2;
+      this.life = 0.7 + Math.random() * 0.9;
+      this.opacity = 0.3 + Math.random() * 0.4;
     }
     update(t, emissionRate) {
-      this.y -= this.speed * (0.5 + emissionRate);
-      this.x += Math.sin(t*0.5 + this.wobble) * 0.6;
-      this.life -= 0.003;
-      if (this.y < -40 || this.life <= 0) {
+      this.y -= this.speed * (0.6 + emissionRate * 1.5);
+      this.x += Math.sin(t * 0.8 + this.wobble) * 0.8;
+      this.life -= 0.004;
+      if (this.y < this.towerTopY - 70 || this.life <= 0) {
         this.reset();
-        this.y = pipeY[this.pipeIdx] - 10 - Math.random()*25;
-        this.life = 0.6 + Math.random()*0.8;
       }
     }
     draw(ctx) {
@@ -209,10 +258,72 @@
       ctx.save(); ctx.globalAlpha = alpha;
       const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.size);
       grad.addColorStop(0, 'rgba(255,255,255,0.9)');
-      grad.addColorStop(0.6, 'rgba(220,220,220,0.5)');
-      grad.addColorStop(1, 'rgba(200,200,200,0)');
-      ctx.fillStyle = grad; ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2); ctx.fill();
+      grad.addColorStop(0.7, 'rgba(230,230,230,0.4)');
+      grad.addColorStop(1, 'rgba(210,210,210,0)');
+      ctx.fillStyle = grad;
+      ctx.beginPath(); ctx.arc(this.x, this.y, this.size, 0, Math.PI*2);
+      ctx.fill();
       ctx.restore();
+    }
+  }
+
+  // 冷却塔绘制函数
+  function drawCoolingTower(ctx, x, baseY, scale = 1) {
+    const h = 55 * scale;
+    const baseR = 22 * scale;
+    const neckR = 12 * scale;
+    const topR = 16 * scale;
+    const neckY = baseY - h * 0.55;
+    const topY = baseY - h;
+    
+    ctx.save();
+    ctx.translate(x, baseY);
+    
+    // 主体 (双曲面轮廓)
+    ctx.beginPath();
+    ctx.moveTo(-baseR, 0);
+    ctx.quadraticCurveTo(-baseR*0.9, -h*0.25, -neckR, neckY);
+    ctx.quadraticCurveTo(-neckR*0.9, -h*0.75, -topR, topY);
+    ctx.lineTo(topR, topY);
+    ctx.quadraticCurveTo(neckR*0.9, -h*0.75, neckR, neckY);
+    ctx.quadraticCurveTo(baseR*0.9, -h*0.25, baseR, 0);
+    ctx.closePath();
+    
+    const towerGrad = ctx.createLinearGradient(0, topY, 0, 0);
+    towerGrad.addColorStop(0, '#7a8b9e');
+    towerGrad.addColorStop(0.4, '#a0b0c0');
+    towerGrad.addColorStop(0.6, '#6b7a8d');
+    towerGrad.addColorStop(1, '#4a5568');
+    ctx.fillStyle = towerGrad;
+    ctx.fill();
+    ctx.strokeStyle = '#2d3748';
+    ctx.lineWidth = 1.2 * scale;
+    ctx.stroke();
+    
+    // 底部阴影
+    ctx.beginPath();
+    ctx.ellipse(0, 0, baseR*1.05, 3, 0, 0, Math.PI*2);
+    ctx.fillStyle = 'rgba(0,0,0,0.25)';
+    ctx.fill();
+    
+    // 顶部开口
+    ctx.beginPath();
+    ctx.ellipse(0, topY, topR*1.1, 2, 0, 0, Math.PI*2);
+    ctx.fillStyle = '#1a202c';
+    ctx.fill();
+    
+    ctx.restore();
+    return { x: x, topY: topY + baseY };
+  }
+
+  let towers = [];
+  function updateTowers() {
+    towers = [];
+    for (let i = 0; i < pipeCount; i++) {
+      const x = width * 0.12 + i * 25;
+      const baseY = pipeY[i] - pipeOuterR - 15;
+      const tower = drawCoolingTower(ctx, x, baseY, 0.85);
+      towers.push({ pipeIdx: i, x: tower.x, topY: tower.topY, baseY: baseY });
     }
   }
 
@@ -223,7 +334,11 @@
       for (let i = 0; i < COINS_PER_PIPE; i++) particles.push(new Particle(p, 'coin'));
     }
     smokeParticles = [];
-    for (let i = 0; i < MAX_SMOKE; i++) smokeParticles.push(new SmokeParticle(i % pipeCount));
+    if (towers.length === 0) updateTowers();
+    for (let i = 0; i < MAX_SMOKE; i++) {
+      const idx = i % pipeCount;
+      if (towers[idx]) smokeParticles.push(new SmokeParticle(idx, towers[idx].x, towers[idx].topY));
+    }
   }
 
   // ----- 脉冲 -----
@@ -240,11 +355,10 @@
     isAlive(){return this.life>0.01&&this.radius<this.maxR;}
   }
 
-  // ----- 绘制函数 -----
   function drawBackground(ctx) {
     const grad=ctx.createLinearGradient(0,0,0,height); grad.addColorStop(0,'#070b17'); grad.addColorStop(0.5,'#0c1125'); grad.addColorStop(1,'#070b17');
     ctx.fillStyle=grad; ctx.fillRect(0,0,width,height);
-    ctx.save(); ctx.globalAlpha=0.05; ctx.strokeStyle='#4a6490'; ctx.lineWidth=0.4;
+    ctx.save(); ctx.globalAlpha=0.04; ctx.strokeStyle='#4a6490'; ctx.lineWidth=0.4;
     for(let x=0;x<width;x+=40){ctx.beginPath();ctx.moveTo(x,0);ctx.lineTo(x,height);ctx.stroke();}
     for(let y=0;y<height;y+=40){ctx.beginPath();ctx.moveTo(0,y);ctx.lineTo(width,y);ctx.stroke();}
     ctx.restore();
@@ -270,28 +384,27 @@
 
   function drawLabels(ctx) {
     ctx.save(); ctx.font='bold 13px "Microsoft YaHei", sans-serif'; ctx.textAlign='left'; ctx.textBaseline='middle';
-    for(let i=0;i<pipeCount;i++){ ctx.fillStyle='#ffffff'; ctx.shadowColor='#000000'; ctx.shadowBlur=4; ctx.fillText(PIPE_LABELS[i], 16, pipeY[i]); }
+    for(let i=0;i<pipeCount;i++) {
+      const label = PIPE_LABELS[i] + (pipeActive[i] ? '' : ' ⏸');
+      ctx.fillStyle = pipeActive[i] ? '#ffffff' : '#888888';
+      ctx.shadowColor='#000000'; ctx.shadowBlur=4;
+      ctx.fillText(label, width * 0.24, pipeY[i]);
+    }
     ctx.restore();
   }
 
-  // 更新面板HTML
   function updateDashboard() {
     const d = data;
     const totalCO2 = d.elecCO2 + d.heatCO2 + d.waterCO2;
     const totalCost = d.elecCost + d.heatCost + d.waterCost;
     dashboardEl.innerHTML = `
-      <div class="card"><span class="label">⚡电能</span><span class="value elec">${d.elecPower.toFixed(1)}</span><span class="unit">kW</span> <span class="value cost-color">¥${d.elecCost.toFixed(2)}</span> <span class="value carbon-color">${d.elecCO2.toFixed(2)}kg/h</span></div>
-      <div class="card"><span class="label">🔥热能</span><span class="value heat">${d.heatPower.toFixed(1)}</span><span class="unit">kW</span> <span class="value cost-color">¥${d.heatCost.toFixed(2)}</span> <span class="value carbon-color">${d.heatCO2.toFixed(2)}kg/h</span></div>
-      <div class="card"><span class="label">💧水流</span><span class="value water">${d.waterFlow.toFixed(1)}</span><span class="unit">L/min</span> <span class="value cost-color">¥${d.waterCost.toFixed(2)}</span> <span class="value carbon-color">${d.waterCO2.toFixed(2)}kg/h</span></div>
+      <div class="card"><span class="label">⚡电能</span><span class="value elec">${d.elecPower.toFixed(1)}</span><span class="unit">kW</span> <span class="value cost-color">¥${d.elecCost.toFixed(2)}</span> <span class="value carbon-color">${d.elecCO2.toFixed(2)}</span></div>
+      <div class="card"><span class="label">🔥热能</span><span class="value heat">${d.heatPower.toFixed(1)}</span><span class="unit">kW</span> <span class="value cost-color">¥${d.heatCost.toFixed(2)}</span> <span class="value carbon-color">${d.heatCO2.toFixed(2)}</span></div>
+      <div class="card"><span class="label">💧水流</span><span class="value water">${d.waterFlow.toFixed(1)}</span><span class="unit">L/min</span> <span class="value cost-color">¥${d.waterCost.toFixed(2)}</span> <span class="value carbon-color">${d.waterCO2.toFixed(2)}</span></div>
       <div class="card total-row"><span class="label">🌿总CO₂</span><span class="value carbon-color">${totalCO2.toFixed(2)}</span><span class="unit">kg/h</span> <span class="label">💰总费用</span><span class="value cost-color">¥${totalCost.toFixed(2)}</span></div>
-      <div class="card"><span class="label">📊状态</span><span class="value" style="color:#7fdb6a;">● 运行中</span></div>
     `;
-    if (!globalOn) {
-      dashboardEl.querySelector('.card:last-child .value').innerHTML = '<span style="color:#e05555;">● 已停止</span>';
-    }
   }
 
-  // ----- 主循环 -----
   function animate(ts) {
     time = ts * 0.001;
     ctx.clearRect(0,0,width,height);
@@ -299,9 +412,10 @@
     mouseX += (targetMouseX - mouseX) * 0.15;
     mouseY += (targetMouseY - mouseY) * 0.15;
 
-    data.elecPower = globalOn ? (8 + intensity*10) : 0;
-    data.heatPower = globalOn ? (5 + intensity*8) : 0;
-    data.waterFlow = globalOn ? (3 + intensity*6) : 0;
+    // 计算各管道功率（若管道关闭则为0）
+    data.elecPower = pipeActive[0] ? (8 + intensity*10) : 0;
+    data.heatPower = pipeActive[1] ? (5 + intensity*8) : 0;
+    data.waterFlow = pipeActive[2] ? (3 + intensity*6) : 0;
     data.elecCost = data.elecPower * 0.75;
     data.heatCost = data.heatPower * 0.55;
     data.waterCost = data.waterFlow * 0.004 * 60;
@@ -312,76 +426,112 @@
     drawBackground(ctx);
     for (let i=0;i<pipeCount;i++) drawPipe(ctx, pipeY[i], pipeOuterR, pipeInnerR, i);
 
-    const coinSpeed = globalOn ? (1.2 + (data.elecCost+data.heatCost+data.waterCost)*0.25) : 0.05;
+    // 绘制冷却塔
+    updateTowers();
+    for (let t of towers) {
+      drawCoolingTower(ctx, t.x, t.baseY, 0.85);
+    }
+
+    const totalCost = data.elecCost + data.heatCost + data.waterCost;
+    const coinSpeed = (totalCost > 0 ? (1.2 + totalCost * 0.25) : 0.2);
     for (let p of particles) {
-      p.update(time, intensity, globalOn, coinSpeed);
+      p.update(time, intensity, coinSpeed);
       p.draw(ctx);
     }
 
-    const emissionRates = [data.elecCO2 / 10, data.heatCO2 / 8, data.waterCO2 / 3];
+    // 更新云烟粒子
+    const emissionRates = [data.elecCO2/12, data.heatCO2/10, data.waterCO2/4];
     for (let s of smokeParticles) {
-      const rate = emissionRates[s.pipeIdx] || 0.2;
+      const rate = emissionRates[s.pipeIdx] || 0.1;
       s.update(time, Math.min(2.0, rate));
       s.draw(ctx);
     }
 
-    if (globalOn && Math.random()<0.03 && pulses.length<MAX_PULSES) {
-      const idx = Math.floor(Math.random()*pipeCount);
-      pulses.push(new Pulse(Math.random()*width, pipeY[idx], PIPE_TYPE[idx], 0.5));
-    }
-    if (mousePressed && mouseX>0 && mouseY>0 && mouseX<width && mouseY<height && Math.random()<0.35 && pulses.length<MAX_PULSES) {
-      let ni=0, md=Math.abs(mouseY-pipeY[0]);
-      for(let i=1;i<pipeCount;i++){const d=Math.abs(mouseY-pipeY[i]); if(d<md){md=d;ni=i;}}
-      if(md<pipeOuterR+20) pulses.push(new Pulse(mouseX, mouseY, PIPE_TYPE[ni], 0.8));
+    // 脉冲
+    if (pipeActive.some(a => a) && Math.random()<0.03 && pulses.length<MAX_PULSES) {
+      const activeIdx = pipeActive.map((a,i) => a ? i : -1).filter(i => i>=0);
+      if (activeIdx.length) {
+        const idx = activeIdx[Math.floor(Math.random()*activeIdx.length)];
+        pulses.push(new Pulse(Math.random()*width, pipeY[idx], PIPE_TYPE[idx], 0.5));
+      }
     }
     for (let p of pulses) p.update();
     pulses = pulses.filter(p=>p.isAlive());
     for (let p of pulses) p.draw(ctx);
 
     drawLabels(ctx);
-    
-    if (mouseX>0 && mouseY>0 && mouseX<width && mouseY<height) {
-      for(let i=0;i<pipeCount;i++) {
-        if(Math.abs(mouseY-pipeY[i]) < pipeOuterR+12) {
-          ctx.save(); ctx.globalAlpha=0.15;
-          const hl=ctx.createLinearGradient(0,pipeY[i]-pipeOuterR-6,0,pipeY[i]+pipeOuterR+6);
-          hl.addColorStop(0,'rgba(180,200,255,0)'); hl.addColorStop(0.5,'rgba(180,200,255,0.7)'); hl.addColorStop(1,'rgba(180,200,255,0)');
-          ctx.fillStyle=hl; ctx.fillRect(0,pipeY[i]-pipeOuterR-6,width,(pipeOuterR+6)*2); ctx.restore(); break;
-        }
-      }
-    }
-
     updateDashboard();
     requestAnimationFrame(animate);
   }
 
-  // ----- 事件 -----
-  function getPos(e){const r=container.getBoundingClientRect(); return{x:e.clientX-r.left,y:e.clientY-r.top};}
-  container.addEventListener('mousemove',e=>{const p=getPos(e);targetMouseX=p.x;targetMouseY=p.y;});
-  container.addEventListener('mousedown',e=>{mousePressed=true;const p=getPos(e);targetMouseX=p.x;targetMouseY=p.y;mouseX=p.x;mouseY=p.y;for(let i=0;i<4;i++)pulses.push(new Pulse(p.x+(Math.random()-0.5)*25,p.y+(Math.random()-0.5)*20,'electric',1.2));hintEl.style.opacity='0';});
-  container.addEventListener('mouseup',()=>{mousePressed=false;setTimeout(()=>{if(!mousePressed)hintEl.style.opacity='1';},2000);});
-  container.addEventListener('mouseleave',()=>{mousePressed=false;targetMouseX=-200;targetMouseY=-200;setTimeout(()=>{hintEl.style.opacity='1';},2000);});
-  container.addEventListener('click',e=>{const p=getPos(e);let on=false;for(let i=0;i<pipeCount;i++)if(Math.abs(p.y-pipeY[i])<pipeOuterR+14)on=true;if(on){globalOn=!globalOn;if(!globalOn)targetIntensity=0;else if(targetIntensity<0.3)targetIntensity=1.0;}});
-  container.addEventListener('wheel',e=>{e.preventDefault();if(!globalOn){globalOn=true;targetIntensity=0.5;}targetIntensity=Math.max(0.2,Math.min(2.5,targetIntensity-e.deltaY*0.005));},{passive:false});
-  container.addEventListener('touchmove',e=>{e.preventDefault();const p=getPos(e.touches[0]);targetMouseX=p.x;targetMouseY=p.y;if(mousePressed&&Math.random()<0.3)pulses.push(new Pulse(p.x,p.y,'electric',0.7));},{passive:false});
-  container.addEventListener('touchstart',e=>{e.preventDefault();mousePressed=true;const p=getPos(e.touches[0]);targetMouseX=p.x;targetMouseY=p.y;mouseX=p.x;mouseY=p.y;let on=false;for(let i=0;i<pipeCount;i++)if(Math.abs(p.y-pipeY[i])<pipeOuterR+14)on=true;if(on){globalOn=!globalOn;if(!globalOn)targetIntensity=0;else if(targetIntensity<0.3)targetIntensity=1.0;}hintEl.style.opacity='0';},{passive:false});
-  container.addEventListener('touchend',()=>{mousePressed=false;setTimeout(()=>{hintEl.style.opacity='1';},2000);});
-  window.addEventListener('keydown',e=>{if(e.key===' '){e.preventDefault();globalOn=!globalOn;if(!globalOn)targetIntensity=0;else if(targetIntensity<0.3)targetIntensity=1.0;}else if(e.key==='ArrowUp'){e.preventDefault();if(!globalOn)globalOn=true;targetIntensity=Math.min(2.5,targetIntensity+0.25);}else if(e.key==='ArrowDown'){e.preventDefault();targetIntensity=Math.max(0.2,targetIntensity-0.25);if(targetIntensity<0.25)globalOn=false;}});
-  window.addEventListener('resize',()=>{clearTimeout(window.resizeTimer);window.resizeTimer=setTimeout(()=>resize(),250);});
+  // ----- 事件绑定 -----
+  function getPos(e){const r=container.getBoundingClientRect(); return{x:e.clientX-r.left, y:e.clientY-r.top};}
+  
+  // 按钮事件
+  document.querySelectorAll('.pipe-btn').forEach(btn => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const idx = parseInt(btn.dataset.pipe);
+      pipeActive[idx] = !pipeActive[idx];
+      btn.classList.toggle('active', pipeActive[idx]);
+      btn.classList.toggle('inactive', !pipeActive[idx]);
+    });
+  });
+
+  // 鼠标/触摸交互
+  container.addEventListener('mousedown', e => {
+    mousePressed = true;
+    const p = getPos(e);
+    mouseX = p.x; mouseY = p.y;
+    targetMouseX = p.x; targetMouseY = p.y;
+  });
+  container.addEventListener('mousemove', e => {
+    const p = getPos(e);
+    targetMouseX = p.x; targetMouseY = p.y;
+  });
+  container.addEventListener('mouseup', () => { mousePressed = false; });
+  container.addEventListener('mouseleave', () => { mousePressed = false; });
+
+  // 触摸手势：上划加速，下划减速
+  container.addEventListener('touchstart', e => {
+    e.preventDefault();
+    isTouching = true;
+    const touch = e.touches[0];
+    touchStartY = touch.clientY;
+    touchLastY = touchStartY;
+  }, {passive: false});
+  
+  container.addEventListener('touchmove', e => {
+    e.preventDefault();
+    if (!isTouching) return;
+    const touch = e.touches[0];
+    const deltaY = touch.clientY - touchLastY;
+    touchLastY = touch.clientY;
+    // 上划 (deltaY < 0) 加速，下划减速
+    targetIntensity = Math.max(0.2, Math.min(2.5, targetIntensity - deltaY * 0.02));
+  }, {passive: false});
+  
+  container.addEventListener('touchend', () => { isTouching = false; });
+  container.addEventListener('touchcancel', () => { isTouching = false; });
+
+  // 滚轮保留
+  container.addEventListener('wheel', e => {
+    e.preventDefault();
+    targetIntensity = Math.max(0.2, Math.min(2.5, targetIntensity - e.deltaY * 0.005));
+  }, {passive: false});
+
+  window.addEventListener('resize', () => {
+    clearTimeout(window.resizeTimer);
+    window.resizeTimer = setTimeout(() => resize(), 200);
+  });
   resize();
   requestAnimationFrame(animate);
 })();
 </script>
-
-<!-- 注册 Service Worker -->
 <script>
   if ('serviceWorker' in navigator) {
     window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js').then(reg => {
-        console.log('Service Worker 注册成功');
-      }).catch(err => {
-        console.log('Service Worker 注册失败', err);
-      });
+      navigator.serviceWorker.register('sw.js').catch(() => {});
     });
   }
 </script>
